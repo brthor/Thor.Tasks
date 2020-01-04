@@ -15,7 +15,8 @@ namespace Gofer.NET.Tests
         [Fact]
         public void ItPersistsPropertiesWhenSerializedAndDeserialized()
         {  
-            var taskKey = $"{nameof(ItPersistsPropertiesWhenSerializedAndDeserialized)}::{Guid.NewGuid().ToString()}";
+            var taskKey = 
+                new TaskKey($"{nameof(ItPersistsPropertiesWhenSerializedAndDeserialized)}::{Guid.NewGuid().ToString()}");
 
             var testTask = GetTestTask(() => 
                 Console.WriteLine(nameof(ItPersistsPropertiesWhenSerializedAndDeserialized)));
@@ -43,7 +44,7 @@ namespace Gofer.NET.Tests
             var taskInfo1 = GetTestTask(() => TestMethod1("hello world"));
             var taskInfo2 = GetTestTask(() => TestMethod2());
 
-            var taskKey = $"{nameof(ItPersistsPropertiesWhenSerializedAndDeserialized)}::{Guid.NewGuid().ToString()}";
+            var taskKey = new TaskKey($"{nameof(ItPersistsPropertiesWhenSerializedAndDeserialized)}::{Guid.NewGuid().ToString()}");
 
             new RecurringTask(taskInfo1, TimeSpan.FromMinutes(5), taskKey)
                 .IsEquivalent(new RecurringTask(taskInfo1, TimeSpan.FromMinutes(5), taskKey))
@@ -71,7 +72,7 @@ namespace Gofer.NET.Tests
 
             Action differentIdsThrow = () => 
                 new RecurringTask(taskInfo1, TimeSpan.FromMinutes(5), taskKey)
-                    .IsEquivalent(new RecurringTask(taskInfo1, TimeSpan.FromMinutes(5), "anothertaskkey"));
+                    .IsEquivalent(new RecurringTask(taskInfo1, TimeSpan.FromMinutes(5), new TaskKey("anothertaskkey")));
             
             differentIdsThrow.ShouldThrow<Exception>();
         }

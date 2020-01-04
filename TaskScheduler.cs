@@ -69,7 +69,7 @@ namespace Gofer.NET
 
         public async Task<ScheduledTask> AddScheduledTask(Expression<Action> action, TimeSpan offsetFromNow)
         {
-            var scheduledTask = new ScheduledTask(action.ToTaskInfo(), offsetFromNow, UniqueTaskKey());
+            var scheduledTask = new ScheduledTask(action.ToTaskInfo(), offsetFromNow, TaskKey.CreateUnique());
 
             await EnqueueScheduledTask(scheduledTask);
 
@@ -78,7 +78,7 @@ namespace Gofer.NET
 
         public async Task<ScheduledTask> AddScheduledTask(Expression<Action> action, DateTimeOffset scheduledTime)
         {
-            var scheduledTask = new ScheduledTask(action.ToTaskInfo(), scheduledTime, UniqueTaskKey());
+            var scheduledTask = new ScheduledTask(action.ToTaskInfo(), scheduledTime, TaskKey.CreateUnique());
 
             await EnqueueScheduledTask(scheduledTask);
 
@@ -87,7 +87,7 @@ namespace Gofer.NET
 
         public async Task<ScheduledTask> AddScheduledTask(Expression<Action> action, DateTime scheduledTime)
         {
-            var scheduledTask = new ScheduledTask(action.ToTaskInfo(), scheduledTime, UniqueTaskKey());
+            var scheduledTask = new ScheduledTask(action.ToTaskInfo(), scheduledTime, TaskKey.CreateUnique());
 
             await EnqueueScheduledTask(scheduledTask);
 
@@ -96,7 +96,8 @@ namespace Gofer.NET
 
         public async Task<RecurringTask> AddRecurringTask(Expression<Action> action, TimeSpan interval, string taskName)
         {
-            var recurringTask = new RecurringTask(action.ToTaskInfo(), interval, RecurringTaskKey(taskName));
+            var recurringTask = new RecurringTask(action.ToTaskInfo(), interval, 
+                TaskKey.CreateRecurring(taskName));
 
             if (await RecurringTaskDoesNotExistOrNeedsChange(recurringTask)) 
             {
@@ -109,7 +110,8 @@ namespace Gofer.NET
 
         public async Task<RecurringTask> AddRecurringTask(Expression<Action> action, string crontab, string taskName)
         {
-            var recurringTask = new RecurringTask(action.ToTaskInfo(), crontab, RecurringTaskKey(taskName));
+            var recurringTask = new RecurringTask(action.ToTaskInfo(), crontab, 
+                TaskKey.CreateRecurring(taskName));
 
             if (await RecurringTaskDoesNotExistOrNeedsChange(recurringTask)) 
             {
@@ -124,12 +126,17 @@ namespace Gofer.NET
             return await CancelTask(recurringTask.TaskKey);
         }
 
+        public async Task<bool> CancelRecurringTask(string taskName) 
+        {
+            return await CancelTask(TaskKey.CreateRecurring(taskName));
+        }
+
         public async Task<bool> CancelScheduledTask(ScheduledTask scheduledTask) 
         {
             return await CancelTask(scheduledTask.TaskKey);
         }
 
-        public async Task<bool> CancelTask(string taskKey)
+        public async Task<bool> CancelTask(TaskKey taskKey)
         {
             if (LoadedCancelTaskScript == null)
             {
@@ -142,10 +149,23 @@ namespace Gofer.NET
                     (RedisKey) ScheduledTasksMapKey,
                 },
                 new [] {
-                    (RedisValue) taskKey
+                    (RedisValue) taskKey.Value
                 });
 
             return (bool) didCancel;
+        }
+
+        public async Task<RecurringTask> GetRecurringTask(TaskKey taskKey)
+        {
+            var serializedRecurringTask = await _taskQueue.Backend.GetMapField(ScheduledTasksMapKey, 
+                $"serializedRecurringTask::{taskKey.Value}");
+
+            if (string.IsNullOrEmpty(serializedRecurringTask))
+                return null;
+            
+            var recurringTask = JsonTaskInfoSerializer.Deserialize<RecurringTask>(serializedRecurringTask);
+
+            return recurringTask;
         }
 
         public async Task<RecurringTask> GetRecurringTask(string taskKey)
@@ -198,7 +218,7 @@ namespace Gofer.NET
         {
             var serializedTaskInfo = JsonTaskInfoSerializer.Serialize(recurringTask.TaskInfo);
             await _taskQueue.Backend.SetMapFields(ScheduledTasksMapKey, 
-                (recurringTask.TaskKey, serializedTaskInfo),
+                (recurringTask.TaskKey.Value, serializedTaskInfo),
                 ($"isRecurring::{recurringTask.TaskKey}", true),
                 ($"serializedRecurringTask::{recurringTask.TaskKey}", JsonTaskInfoSerializer.Serialize(recurringTask)));
 
@@ -207,7 +227,7 @@ namespace Gofer.NET
             await _taskQueue.Backend.AddToOrderedSet(
                 ScheduledTasksOrderedSetKey, 
                 nextRunTimestamp, 
-                recurringTask.TaskKey);
+                recurringTask.TaskKey.Value);
         }
 
         private async Task EnqueueScheduledTask(ScheduledTask scheduledTask)
@@ -215,13 +235,13 @@ namespace Gofer.NET
             var serializedTaskInfo = JsonTaskInfoSerializer.Serialize(scheduledTask.TaskInfo);
             
             await _taskQueue.Backend.SetMapFields(ScheduledTasksMapKey, 
-                (scheduledTask.TaskKey, serializedTaskInfo),
+                (scheduledTask.TaskKey.Value, serializedTaskInfo),
                 ($"isRecurring::{scheduledTask.TaskKey}", false));
 
             await _taskQueue.Backend.AddToOrderedSet(
                 ScheduledTasksOrderedSetKey, 
                 scheduledTask.ScheduledUnixTimeMilliseconds, 
-                scheduledTask.TaskKey);
+                scheduledTask.TaskKey.Value);
         }
 
         private async Task RescheduleRecurringTasks()
@@ -251,7 +271,7 @@ namespace Gofer.NET
                 recurringTask = JsonTaskInfoSerializer.Deserialize<RecurringTask>(serializedRecurringTask);
                 nextRunTimestamp = recurringTask.GetNextRunTimestamp(DateTime.UtcNow);
 
-                args.Add((RedisValue) recurringTask.TaskKey);
+                args.Add((RedisValue) recurringTask.TaskKey.Value);
                 args.Add((RedisValue) nextRunTimestamp);
             }
 
@@ -361,16 +381,6 @@ namespace Gofer.NET
 
                 return false
                 ";
-        }
-
-        private string UniqueTaskKey()
-        {
-            return $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}::{Guid.NewGuid().ToString()}";
-        }
-
-        private string RecurringTaskKey(string taskName)
-        {
-            return $"{nameof(RecurringTaskKey)}::{taskName}";
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Gofer.NET
         public string LockKey => $"{nameof(ScheduledTask)}::{TaskKey}::ScheduleLock";
 
         [JsonProperty]
-        public string TaskKey { get; private set; }
+        public TaskKey TaskKey { get; private set; }
 
         [JsonProperty]
         public long ScheduledUnixTimeMilliseconds { get; private set; }
@@ -25,7 +25,7 @@ namespace Gofer.NET
         public ScheduledTask(
             TaskInfo taskInfo,
             TimeSpan offset,
-            string taskKey) : this(taskInfo, new DateTimeOffset(DateTime.UtcNow + offset), taskKey)
+            TaskKey taskKey) : this(taskInfo, new DateTimeOffset(DateTime.UtcNow + offset), taskKey)
         {
         }
 
@@ -33,14 +33,14 @@ namespace Gofer.NET
             TaskInfo taskInfo,
             DateTime scheduledTime,
             TaskQueue taskQueue,
-            string taskKey) : this(taskInfo, new DateTimeOffset(scheduledTime), taskKey)
+            TaskKey taskKey) : this(taskInfo, new DateTimeOffset(scheduledTime), taskKey)
         {
         }
 
         public ScheduledTask(
             TaskInfo taskInfo,
             DateTimeOffset scheduledDateTimeOffset,
-            string taskKey)
+            TaskKey taskKey)
         {
             TaskKey = taskKey;
             TaskInfo = taskInfo;

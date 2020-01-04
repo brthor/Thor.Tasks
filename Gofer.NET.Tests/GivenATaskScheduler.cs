@@ -244,7 +244,7 @@ namespace Gofer.NET.Tests
             var taskQueue = TaskQueueTestFixture.UniqueRedisTaskQueue();
             var taskScheduler = new TaskScheduler(taskQueue);
 
-            (await taskScheduler.CancelTask("hello")).Should().BeFalse();
+            (await taskScheduler.CancelTask(new TaskKey("hello"))).Should().BeFalse();
         }
 
         [Fact]

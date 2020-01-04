@@ -12,7 +12,7 @@ namespace Gofer.NET
         public string LockKey => $"{nameof(RecurringTask)}::{TaskKey}::ScheduleLock";
 
         [JsonProperty]
-        public string TaskKey { get; private set; }
+        public TaskKey TaskKey { get; private set; }
 
         [JsonProperty]
         public DateTime StartTime { get; private set; }
@@ -34,7 +34,7 @@ namespace Gofer.NET
         public RecurringTask(
             TaskInfo taskInfo,
             TimeSpan interval,
-            string taskKey) : this(taskInfo, taskKey)
+            TaskKey taskKey) : this(taskInfo, taskKey)
         {
             Interval = interval;
 
@@ -44,7 +44,7 @@ namespace Gofer.NET
         public RecurringTask(
             TaskInfo taskInfo,
             string crontab,
-            string taskKey) : this(taskInfo, taskKey)
+            TaskKey taskKey) : this(taskInfo, taskKey)
         {
             ValidateCrontab(crontab);
             Crontab = crontab;
@@ -52,7 +52,7 @@ namespace Gofer.NET
             FirstRunTime = GetNextRunTime(DateTime.UtcNow);
         }
 
-        private RecurringTask(TaskInfo taskInfo, string taskKey)
+        private RecurringTask(TaskInfo taskInfo, TaskKey taskKey)
         {
             TaskInfo = taskInfo;
             StartTime = DateTime.UtcNow;
@@ -122,7 +122,7 @@ namespace Gofer.NET
                 throw new ArgumentException("comparisonRecurringTask must not be null");
             }
 
-            if (comparisonRecurringTask.TaskKey != TaskKey) 
+            if (!comparisonRecurringTask.TaskKey.Equals(TaskKey))
             {
                 throw new Exception("Cannot compare with a recurringTask with a different TaskKey.");
             }
