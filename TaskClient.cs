@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Gofer.NET.Errors;
 using Gofer.NET.Utils;
 using Newtonsoft.Json;
+using System.Linq;
 
 namespace Gofer.NET
 {
@@ -24,7 +25,7 @@ namespace Gofer.NET
 
         private Task TaskSchedulerThread { get; set; }
 
-        private Task TaskRunnerThread { get; set; }
+        private Task[] TaskRunnerThreads { get; set; }
 
         private CancellationTokenSource ListenCancellationTokenSource { get; set; }
 
@@ -40,16 +41,22 @@ namespace Gofer.NET
 
         public async Task Listen()
         {
-            Start();
-
-            await Task.WhenAll(new [] {
-                TaskRunnerThread, 
-                TaskSchedulerThread});
+            await Listen(1);
         }
 
-        public CancellationTokenSource Start()
+        public async Task Listen(int listenerThreads)
         {
-            if (TaskSchedulerThread != null || TaskRunnerThread != null)
+            Start(listenerThreads);
+
+            var allList = TaskRunnerThreads.ToList();
+            allList.Add(TaskSchedulerThread);
+
+            await Task.WhenAll(allList);
+        }
+
+        public CancellationTokenSource Start(int listenerThreads)
+        {
+            if (TaskSchedulerThread != null || TaskRunnerThreads != null)
             {
                 throw new Exception("This TaskClient is already listening.");
             }
@@ -71,23 +78,29 @@ namespace Gofer.NET
                 }
             }, ListenCancellationTokenSource.Token);
 
-            TaskRunnerThread = Task.Run(async () => {
-                while (true)
-                {
-                    if (token.IsCancellationRequested)
+            TaskRunnerThreads = new Task[listenerThreads];
+
+            for (int t = 0; t < listenerThreads; t++)
+			{
+                TaskRunnerThreads[t] = Task.Run(async () => {
+                    while (true)
                     {
-                        return;
-                    }
+                        if (token.IsCancellationRequested)
+                        {
+                            return;
+                        }
                     
-                    await ExecuteQueuedTask();
-                }
-            }, ListenCancellationTokenSource.Token);
+                        await ExecuteQueuedTask();
+                    }
+                }, ListenCancellationTokenSource.Token);
+			}
 
             return ListenCancellationTokenSource;
         }
 
         private async Task ExecuteQueuedTask()
         {
+            Console.WriteLine("Dequing in thread {0}", Thread.CurrentThread.ManagedThreadId.ToString());
             var (json, info) = await TaskQueue.SafeDequeue();
             if (info != null)
             {
