@@ -12,7 +12,7 @@ namespace Gofer.NET
     {
         private static readonly object Locker = new object();
         
-        private const int PollDelay = 100;
+        private int _pollDelay;
 
         private bool IsCanceled { get; set; }
         
@@ -30,12 +30,14 @@ namespace Gofer.NET
 
         public TaskClient(
             TaskQueue taskQueue, 
-            Action<Exception> onError=null)
+            Action<Exception> onError=null,
+            int pollDelay=100)
         {
             TaskQueue = taskQueue;
             OnError = onError;
             TaskScheduler = new TaskScheduler(TaskQueue);
             IsCanceled = false;
+            _pollDelay = pollDelay;
         }
 
         public async Task Listen()
@@ -80,6 +82,7 @@ namespace Gofer.NET
                     }
                     
                     await ExecuteQueuedTask();
+                    await Task.Delay(_pollDelay);
                 }
             }, ListenCancellationTokenSource.Token);
 
